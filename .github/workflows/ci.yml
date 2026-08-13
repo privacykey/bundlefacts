@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to the same branch/PR cancels an in-flight run.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: build + test (macOS)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        # A full Xcode (not CommandLineTools) is what makes `swift test`
+        # find XCTest.
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Swift toolchain
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+  ios-purity:
+    name: iOS cross-build (purity gate)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Cross-build for iOS
+        # The library must compile for iOS with no macOS-only imports.
+        run: >
+          xcodebuild -scheme bundlefacts
+          -destination 'generic/platform=iOS'
+          CODE_SIGNING_ALLOWED=NO build
+
+  no-dependencies:
+    name: dependency emptiness gate
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Assert zero package dependencies
+        # Zero package dependencies is a hard invariant. A Package.resolved
+        # can only exist once a dependency has crept in, so its presence
+        # alone is a failure.
+        run: |
+          if [ -e Package.resolved ]; then
+            echo "Package.resolved present — a dependency has crept in"
+            exit 1
+          fi
+          deps="$(swift package show-dependencies)"
+          echo "$deps"
+          if [ "$deps" != "No external dependencies found" ]; then
+            echo "expected an empty dependency tree"
+            exit 1
+          fi
