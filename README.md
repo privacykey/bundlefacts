@@ -35,6 +35,13 @@ Apple's vocabularies ship as data, verified against developer.apple.com
   rules, the 35 collected-data-type values across 16 label categories
   (including the irregular `NSPrivacyCollectedDataTypePhotosorVideos`
   spelling), and the 6 purpose values.
+- `AppleSDKList` — the 86 "commonly used third-party SDKs", with combined
+  entries ("BoringSSL / openssl_grpc") split into canonical + alternative
+  names, a matcher for framework/XCFramework directory names and SPM
+  checkout names (case-, hyphen- and underscore-insensitive, exact match
+  only), and the enforcement-rule constants: privacy manifest required for
+  listed SDKs since 2025-02-12 (ITMS-91061), signature required when
+  consumed as a binary dependency (ITMS-91065).
 
 ## The two-gate purity story
 
